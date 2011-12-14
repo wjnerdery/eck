@@ -11,8 +11,13 @@
 function eck_entity_type_features_export_options() {
   module_load_include('inc', 'eck', 'eck.entity_type');
   $entity_types = array();
-  foreach (eck__entity_type__load() as $entity_type) {
-    $entity_types[$entity_type->name] = $entity_type->label;
+  foreach (entity_get_info() as $entity_type => $info) {
+    // @TODO: Ideally, this module should allow us to access ALL entity types,
+    // but, we currently only want to check on types created through ECK.
+    if (empty($info['module']) || $info['module'] != 'eck') {
+      continue;
+    }
+    $entity_types[$entity_type] = $info['label'];
   }
   return $entity_types;
 }
@@ -51,31 +56,14 @@ function eck_entity_type_features_export_render($module, $data, $export = NULL) 
 
   $output = array();
   $output[] = '  $items = array(';
-
   foreach ($data as $entity_type_name) {
-    // Get the entity definition.
-    $entity_type = eck__entity_type__load($entity_type_name);
-
-    $output[] = "    '{$entity_type->name}' => array(";
-    foreach ($elements as $key => $t) {
-      if ($t) {
-        $text = str_replace("'", "\'", $entity_type->$key);
-        $text = !empty($text) ? "t('{$text}')" : "''";
-        $output[] = "      '{$key}' => {$text},";
-      }
-      else if (is_array($entity_type->$key)) {
-        $output[] = "      '{$key}' => '" . serialize($entity_type->$key) . "',";
-      }
-      else {
-        $output[] = "      '{$key}' => '{$entity_type->$key}',";
-      }
+    // @TODO: There are keys/values which need to be features prepared, but this is a good start.
+    if ($entity_info = entity_get_info($entity_type_name)) {
+      $output[] = "      '{$entity_type_name}' => " . features_var_export($entity_info);
     }
-    $output[] = "    ),";
   }
-
   $output[] = '  );';
   $output[] = '  return $items;';
-
   return array('eck_entity_type_info' => implode("\n", $output));
 }
 
@@ -96,7 +84,7 @@ function eck_entity_type_features_revert($module) {
  * Rebuilds eck entities from code defaults.
  */
 function eck_entity_type_features_rebuild($module) {
- module_load_include('inc', 'eck', 'eck.entity_type');
+  module_load_include('inc', 'eck', 'eck.entity_type');
   if ($default_entities = features_get_default('eck_entity_type', $module)) {
     foreach ($default_entities as $entity_type_name => $entity_type_info) {
       $entity_type = array(
@@ -135,21 +123,28 @@ function eck_entity_type_features_rebuild($module) {
 /**
  * Implementation of hook_features_export_options().
  */
-/*function eck_bundle_features_export_options() {
+function eck_bundle_features_export_options() {
   module_load_include('inc', 'eck', 'eck.bundle');
   $bundles = array();
-  foreach (eck__bundle__load() as $bundle) {
-    $bundles[$bundle->name] = $bundle->label;
+  foreach (entity_get_info() as $entity_type => $entity_info) {
+    // @TODO: Ideally, all bundles should be accessible to features, but
+    // we're currently just targeting those created through ECK.
+    if (empty($entity_info['module']) || $entity_info['module'] != 'eck') {
+      continue;
+    }
+    foreach ($entity_info['bundles'] as $bundle_type => $bundle_info) {
+      $bundles[$bundle_type] = $bundle_info['label'];
+    }
   }
   return $bundles;
-}*/
+}
 
 
 
 /**
  * Implementation of hook_features_export.
  */
-/*function eck_bundle_features_export($data, &$export, $module_name = '') {
+function eck_bundle_features_export($data, &$export, $module_name = '') {
   $pipe = array();
   $map = features_get_default_map('eck');
 
@@ -185,59 +180,46 @@ function eck_entity_type_features_rebuild($module) {
   }
 
   return $pipe;
-}*/
+}
 
 
 
 /**
  * Implementation of hook_features_export_render().
  */
-/*function eck_bundle_features_export_render($module, $data, $export = NULL) {
+function eck_bundle_features_export_render($module, $data, $export = NULL) {
   $elements = array(
     'entity' => FALSE,
     'type' => FALSE,
     'label' => TRUE,
   );
-
   $output = array();
   $output[] = '  $items = array(';
 
-  foreach ($data as $type) {
-    // Get the entity definition.
-    $type = eck__entity_type__load($type);
-
-    if(!$type){
+  foreach (entity_get_info() as $entity_type) {
+    // @TODO: Can entities exist without bundles?
+    if (empty($entity_type['bundles'])) {
       continue;
     }
-
-    $output[] = "    '{$type->type}' => array(";
-    foreach ($elements as $key => $t) {
-      if ($t) {
-        $text = str_replace("'", "\'", $type->$key);
-        $text = !empty($text) ? "t('{$text}')" : "''";
-        $output[] = "      '{$key}' => {$text},";
-      }
-      else {
-        $output[] = "      '{$key}' => '{$type->$key}',";
-      }
+    foreach ($entity_type['bundles'] as $bundle_type => $bundle_info) {
+      $output[] = "      '{$bundle_type}' => " . features_var_export($bundle_info);
     }
-    $output[] = "    ),";
   }
 
   $output[] = '  );';
   $output[] = '  return $items;';
 
-  return array('eck_type_info' => implode("\n", $output));
-}*/
+  return array('eck_bundle_type_info' => implode("\n", $output));
+}
 
 
 
 /**
  * Implementation of hook_features_revert().
  */
-/*function eck_bundle_features_revert($module) {
+function eck_bundle_features_revert($module) {
   eck_type_features_rebuild($module);
-}*/
+}
 
 
 
@@ -246,7 +228,7 @@ function eck_entity_type_features_rebuild($module) {
  *
  * Rebuilds eck entities from code defaults.
  */
-/*function eck_bundle_features_rebuild($module) {
+function eck_bundle_features_rebuild($module) {
   if ($default_types = features_get_default('eck_type', $module)) {
     foreach ($default_types as $type_name => $type_info) {
       $type = array(
@@ -264,7 +246,7 @@ function eck_entity_type_features_rebuild($module) {
     entity_info_cache_clear();
     menu_rebuild();
   }
-}*/
+}
 
 /**
  * @} End of ECK Bundles

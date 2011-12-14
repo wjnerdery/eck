@@ -138,6 +138,7 @@ function get_bundle_admin_info($entity_type, $bundle){
   
   return $info[$entity_type]['bundles'][$bundle]['admin'];
 }
+
 function get_bundle_crud_info($entity_type_name, $bundle_name){
   //dpm($entity_type_name);
   //dpm($bundle_name);
